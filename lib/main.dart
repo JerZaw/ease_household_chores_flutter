@@ -27,8 +27,6 @@
 //   }
 // }
 
-
-
 import 'dart:convert';
 import 'dart:ui';
 import 'package:animated_splash_screen/animated_splash_screen.dart';
@@ -37,7 +35,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
-import 'package:page_transition/page_transition.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -47,20 +44,35 @@ import 'package:fluttertoast/fluttertoast.dart';
 enum EditType {typeHousePart,typeName}
 enum SmallChoreType {typeZmywarka, typeSmieci, typeKotyJedzonko, typeKotySprzatanie, none}
 
+class SmallJob{
+  int count = 0;
+  int value = 0;
+
+  _addOneCount(){count++;}
+  _removeOneCount(){count--;}
+  _resetCount(){count = 0;}
+  _setCount(int arg_count){count = arg_count;}
+  _getCount(){return count;}
+  _getWholeValue(){return count*value;}
+
+  SmallJob(this.value);
+}
+
 class Person {
 
   String name='NO_NAME';
   String housePart='NO_PART';
   DateTime deadline = DateTime.now();
   int daysLeft=0;
-  int zmywarkaCount=0;
-  int smieciCount=0;
-  int kotyJedzenieCount=0;
-  int kotySprzatanieCount=0;
+  SmallJob zmywarka= SmallJob(4);
+  SmallJob smieci = SmallJob(2);
+  SmallJob kotyJedzenie = SmallJob(1);
+  SmallJob kotySprzatanie = SmallJob(3);
+  DateTime lastSummary = DateTime.now();
 
 }
 
-//DODAĆ HISTORIĘ PRAC MIESIĘCZNĄ/TYGODNIOWĄ, ikonkę, ekran ładowania
+//DODAĆ HISTORIĘ PRAC MIESIĘCZNĄ/TYGODNIOWĄ, ekran ładowania?
 
 void main() {
   runApp(const MyApp());
@@ -107,10 +119,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     person.housePart = "NO_PART";
     person.deadline = DateTime.now();
     person.daysLeft = 0;
-    person.zmywarkaCount = 0;
-    person.smieciCount = 0;
-    person.kotyJedzenieCount = 0;
-    person.kotySprzatanieCount = 0;
+    person.zmywarka._resetCount();
+    person.smieci._resetCount();
+    person.kotyJedzenie._resetCount();
+    person.kotySprzatanie._resetCount();
+    person.lastSummary = DateTime.now();
     setState(() {});
     _writeData();
   }
@@ -128,12 +141,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       person.name = _data[0];
       person.housePart = _data[1];
       person.deadline = DateTime.parse(_data[2]);
+      person.lastSummary = DateTime.parse(_data[3]);
 
       person.daysLeft = daysBetween(DateTime.now(), person.deadline);
-      person.zmywarkaCount = int.parse(_data[3]);
-      person.smieciCount = int.parse(_data[4]);
-      person.kotyJedzenieCount = int.parse(_data[5]);
-      person.kotySprzatanieCount = int.parse(_data[6]);
+      person.zmywarka._setCount(int.parse(_data[4]));
+      person.smieci._setCount(int.parse(_data[5]));
+      person.kotyJedzenie._setCount(int.parse(_data[6]));
+      person.kotySprzatanie._setCount(int.parse(_data[7]));
     });
   }
 
@@ -144,8 +158,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     if (pom==1){dniOdmiana = ' dzień'; deadlineTextColor = Colors.deepOrange;}
     else {
       dniOdmiana = ' dni';
-      if(pom==0){deadlineTextColor = Colors.red.shade900;}else if(pom==2){deadlineTextColor = Colors.orange;}
-      else{deadlineTextColor = Colors.green;}
+      if(pom>2){deadlineTextColor = Colors.green;}
+      else if(pom==2){deadlineTextColor = Colors.orange;}
+      else {deadlineTextColor = Colors.red.shade900;}
     }
     return pom;
   }
@@ -159,10 +174,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await _myFile.writeAsString(person.name + '\n');
     await _myFile.writeAsString(person.housePart + '\n',mode: FileMode.append);
     await _myFile.writeAsString(person.deadline.toString() + '\n',mode: FileMode.append);
-    await _myFile.writeAsString(person.zmywarkaCount.toString() + '\n',mode: FileMode.append);
-    await _myFile.writeAsString(person.smieciCount.toString() + '\n',mode: FileMode.append);
-    await _myFile.writeAsString(person.kotyJedzenieCount.toString() + '\n',mode: FileMode.append);
-    await _myFile.writeAsString(person.kotySprzatanieCount.toString() + '\n',mode: FileMode.append);
+    await _myFile.writeAsString(person.lastSummary.toString() + '\n',mode: FileMode.append);
+    await _myFile.writeAsString(person.zmywarka._getCount().toString() + '\n',mode: FileMode.append);
+    await _myFile.writeAsString(person.smieci._getCount().toString() + '\n',mode: FileMode.append);
+    await _myFile.writeAsString(person.kotyJedzenie._getCount().toString() + '\n',mode: FileMode.append);
+    await _myFile.writeAsString(person.kotySprzatanie._getCount().toString() + '\n',mode: FileMode.append);
   }
 
   void _changeNameNavigate(BuildContext context) async{
@@ -201,7 +217,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       switch (newSmallChore) { //dodaje to co wybrane, lub nic
         case SmallChoreType.typeZmywarka :
           {
-            person.zmywarkaCount++;
+            person.zmywarka._addOneCount();
             Fluttertoast.showToast(
               msg: "Pomyślnie dodano zmywarkę",
               toastLength: Toast.LENGTH_SHORT,
@@ -210,7 +226,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           }
         case SmallChoreType.typeSmieci :
           {
-            person.smieciCount++;
+            person.smieci._addOneCount();
             Fluttertoast.showToast(
               msg: "Pomyślnie dodano śmieci",
               toastLength: Toast.LENGTH_SHORT,
@@ -219,7 +235,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           }
         case SmallChoreType.typeKotyJedzonko :
           {
-            person.kotyJedzenieCount++;
+            person.kotyJedzenie._addOneCount();
             Fluttertoast.showToast(
               msg: "Pomyślnie dodano koty - jedzonko",
               toastLength: Toast.LENGTH_SHORT,
@@ -228,7 +244,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           }
         case SmallChoreType.typeKotySprzatanie :
           {
-            person.kotySprzatanieCount++;
+            person.kotySprzatanie._addOneCount();
             Fluttertoast.showToast(
               msg: "Pomyślnie dodano koty - sprzątanie",
               toastLength: Toast.LENGTH_SHORT,
@@ -252,8 +268,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     switch (newSmallChore) { //dodaje to co wybrane, lub nic
       case SmallChoreType.typeZmywarka :
         {
-          if(person.zmywarkaCount >= 1) {
-            person.zmywarkaCount--;
+          if(person.zmywarka._getCount() >= 1) {
+            person.zmywarka._removeOneCount();
             Fluttertoast.showToast(
               msg: "Pomyślnie usunięto zmywarkę",
               toastLength: Toast.LENGTH_SHORT,
@@ -269,8 +285,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         }
       case SmallChoreType.typeSmieci :
         {
-          if(person.smieciCount >= 1) {
-            person.smieciCount--;
+          if(person.smieci._getCount() >= 1) {
+            person.smieci._removeOneCount();
             Fluttertoast.showToast(
               msg: "Pomyślnie usunięto śmieci",
               toastLength: Toast.LENGTH_SHORT,
@@ -286,8 +302,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         }
       case SmallChoreType.typeKotyJedzonko :
         {
-          if(person.kotyJedzenieCount >= 1) {
-            person.kotyJedzenieCount--;
+          if(person.kotyJedzenie._getCount() >= 1) {
+            person.kotyJedzenie._removeOneCount();
             Fluttertoast.showToast(
               msg: "Pomyślnie usunięto koty - jedzonko",
               toastLength: Toast.LENGTH_SHORT,
@@ -303,8 +319,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         }
       case SmallChoreType.typeKotySprzatanie :
         {
-          if(person.kotySprzatanieCount >= 1) {
-            person.kotySprzatanieCount--;
+          if(person.kotySprzatanie._getCount() >= 1) {
+            person.kotySprzatanie._removeOneCount();
             Fluttertoast.showToast(
               msg: "Pomyślnie usunięto koty - sprzątanie",
               toastLength: Toast.LENGTH_SHORT,
@@ -327,8 +343,38 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _writeData();
   }
 
+  void _summaryPageNavigate(BuildContext context) async{
+    int points = _countPoints();
+    bool ifReset = false;
+    ifReset = await Navigator.push(context, MaterialPageRoute(builder: (context) => SummaryPage(points,person.lastSummary)));
+    if(ifReset){
+      person.zmywarka._resetCount();
+      person.smieci._resetCount();
+      person.kotyJedzenie._resetCount();
+      person.kotySprzatanie._resetCount();
+      setState(() {});
+      _writeData();
+    }
+
+  }
+
+  int _countPoints(){
+    return person.zmywarka._getWholeValue() +
+        person.smieci._getWholeValue() +
+        person.kotyJedzenie._getWholeValue() +
+        person.kotySprzatanie._getWholeValue();
+  }
+
   Future _pickDate(BuildContext context) async {
-    final initialDate = person.deadline;
+
+    DateTime initialDate;
+    if(person.deadline.isBefore(DateTime.now())){
+      initialDate = DateTime.now();
+    }
+    else {
+      initialDate = person.deadline;
+    }
+
     final newDate = await showDatePicker(
       context: context,
       initialDate: initialDate,
@@ -400,6 +446,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   _HomePageState(){
     _readData();
+  }
+
+  String deadlineText(){
+    if(person.daysLeft >=0) {
+      return person.daysLeft.toString() + dniOdmiana;
+    }
+    else
+      {return 'PRZEKROCZONO';}
   }
 
     @override
@@ -499,7 +553,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               const SizedBox(height: 10),
               Text(
-                person.daysLeft.toString() + dniOdmiana,
+                deadlineText(),
                 style: TextStyle(
                   fontSize: 30,
                   color: deadlineTextColor,
@@ -525,7 +579,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                       ),
                         Text(
-                          person.zmywarkaCount.toString(),
+                          person.zmywarka._getCount().toString(),
                           style: const TextStyle(
                             fontSize: 18,
                           ),
@@ -543,7 +597,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           ),
                         ),
                         Text(
-                          person.smieciCount.toString(),
+                          person.smieci._getCount().toString(),
                           style: const TextStyle(
                             fontSize: 18,
                           ),
@@ -561,7 +615,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           ),
                         ),
                         Text(
-                          person.kotyJedzenieCount.toString(),
+                          person.kotyJedzenie._getCount().toString(),
                           style: const TextStyle(
                             fontSize: 18,
                           ),
@@ -579,7 +633,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           ),
                         ),
                         Text(
-                          person.kotySprzatanieCount.toString(),
+                          person.kotySprzatanie._getCount().toString(),
                           style: const TextStyle(
                             fontSize: 18,
                           ),
@@ -589,6 +643,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   ],
                 ),
               ),
+              Center(
+                child: ElevatedButton(
+                  onPressed: (){_summaryPageNavigate(context);},
+                  child: Text(
+                    'PODSUMOWANIE',
+                    style: TextStyle(
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              )
             ],
           ),
         ),
@@ -614,6 +679,153 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       );
     }
   }
+
+class SummaryPage extends StatefulWidget {
+  final int points;
+  final DateTime lastSummary;
+  const SummaryPage(this.points, this.lastSummary, {Key? key}) : super(key: key);
+
+  @override
+  _SummaryPageState createState() => _SummaryPageState();
+}
+
+class _SummaryPageState extends State<SummaryPage> {
+
+  late String punktyOdmiana;
+
+  void _punktyOdmiana(){
+    if (widget.points == 1) {punktyOdmiana = " punkt.";}
+    else if (widget.points == 12 || widget.points == 13 || widget.points == 14){punktyOdmiana = " punktów.";}
+    else if (widget.points.toString().endsWith('2') || widget.points.toString().endsWith('3')
+    || widget.points.toString().endsWith('4')) {punktyOdmiana = " punkty.";}
+    else {punktyOdmiana = " punktów.";}
+  }
+
+  Future<void> _smallJobsCleanDialog() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // user must tap button!
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Center(child: Text('OSTRZEŻENIE!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 30, color: Colors.redAccent.shade700,),)),
+          content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children:const [
+                Text('Czy na pewno chcesz usunąć wszystkie małe prace?',textAlign: TextAlign.center,),
+                SizedBox(height: 15),
+                Text('TA OPERACJA JEST NIEODWRACALNA'),
+              ]
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('NIE'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                //Navigator.pop(context,false);
+              },
+            ),
+            TextButton(
+              child: const Text('TAK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.pop(context,true);
+                Fluttertoast.showToast(
+                  msg: "Twoje prace zostały usunięte",
+                  toastLength: Toast.LENGTH_SHORT,
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _monthCheck(int month){
+    if  (month < 10){
+      return  '0' + month.toString();
+    }
+    else{
+      return  month.toString();
+    }
+  }
+
+  @override
+  initState(){
+    super.initState();
+    _punktyOdmiana();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'PODSUMOWANIE',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: const Color(0xee050565),
+        //automaticallyImplyLeading: false //do znikania strzałki cofającej
+      ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(30,40,30,40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              children: [
+                Text('Dzisiaj jest:'),
+                Text(DateTime.now().day.toString() + '.' +
+                    _monthCheck(DateTime.now().month) + '.' +
+                    DateTime.now().year.toString()),
+                SizedBox(height:10),
+                Text('Ostatnie czyszczenie zrobiono:'),
+                Text(widget.lastSummary.day.toString() + '.' +
+                      _monthCheck(widget.lastSummary.month) + '.' +
+                      widget.lastSummary.year.toString()),
+              ],
+            ),
+            Column(
+              children: [
+                Text(
+                    'Gratulacje!',
+                  style: TextStyle(fontSize: 25),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                    'Zdobyłeś: ' + widget.points.toString() + punktyOdmiana,
+                    style: TextStyle(fontSize: 20)
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              //crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                ElevatedButton(
+                    onPressed: (){
+                      Navigator.pop(context, false);
+                    },
+                    child: const Text('TYLKO WRÓĆ')
+                ),
+                ElevatedButton(
+                    onPressed: (){
+                      _smallJobsCleanDialog();
+                    },
+                    child: const Text('WYCZYŚĆ PRACE'),
+                  style: ButtonStyle(backgroundColor: MaterialStateProperty.all<Color>(Colors.red.shade700)),
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class AddingPage extends StatefulWidget {
   const AddingPage(this.dodawanieCzyOdejmowanie, {Key? key}) : super(key: key);
