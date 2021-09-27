@@ -42,11 +42,11 @@ import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
 enum EditType {typeHousePart,typeName}
-enum SmallChoreType {typeZmywarka, typeSmieci, typeKotyJedzonko, typeKotySprzatanie, none}
 
 class SmallJob{
   int count = 0;
   int value = 0;
+  String name = '';
 
   _addOneCount(){count++;}
   _removeOneCount(){count--;}
@@ -54,8 +54,9 @@ class SmallJob{
   _setCount(int arg_count){count = arg_count;}
   _getCount(){return count;}
   _getWholeValue(){return count*value;}
+  _getName(){return name;}
 
-  SmallJob(this.value);
+  SmallJob(this.value, [this.name = 'NONAME']);
 }
 
 class Person {
@@ -64,10 +65,9 @@ class Person {
   String housePart='NO_PART';
   DateTime deadline = DateTime.now();
   int daysLeft=0;
-  SmallJob zmywarka= SmallJob(4);
-  SmallJob smieci = SmallJob(2);
-  SmallJob kotyJedzenie = SmallJob(1);
-  SmallJob kotySprzatanie = SmallJob(3);
+  List<SmallJob> smallJobsArray = [SmallJob(3,'zmywarka'),SmallJob(2,'ociekacz'),SmallJob(2,'śmieci_wymiana'),
+    SmallJob(1,'śmieci_wyrzucenie'),SmallJob(2,'koty_jedzonko'),SmallJob(2,'koty_sprzątanie'),SmallJob(1,'papuga'),
+  SmallJob(2,'obiad_dod'),SmallJob(2,'ciasto'),SmallJob(2,'zakupy_małe'),SmallJob(4,'zakupy_Duże')];
   DateTime lastSummary = DateTime.now();
 
 }
@@ -119,11 +119,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     person.housePart = "NO_PART";
     person.deadline = DateTime.now();
     person.daysLeft = 0;
-    person.zmywarka._resetCount();
-    person.smieci._resetCount();
-    person.kotyJedzenie._resetCount();
-    person.kotySprzatanie._resetCount();
     person.lastSummary = DateTime.now();
+
+    for(int i = 0; i < person.smallJobsArray.length; i++){
+      person.smallJobsArray[i]._resetCount();
+    }
+
     setState(() {});
     _writeData();
   }
@@ -142,12 +143,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       person.housePart = _data[1];
       person.deadline = DateTime.parse(_data[2]);
       person.lastSummary = DateTime.parse(_data[3]);
-
       person.daysLeft = daysBetween(DateTime.now(), person.deadline);
-      person.zmywarka._setCount(int.parse(_data[4]));
-      person.smieci._setCount(int.parse(_data[5]));
-      person.kotyJedzenie._setCount(int.parse(_data[6]));
-      person.kotySprzatanie._setCount(int.parse(_data[7]));
+
+
+      for(int i = 0; i < person.smallJobsArray.length; i++) {
+        person.smallJobsArray[i]._setCount(int.parse(_data[i+4]));
+      }
+
+      //person.zmywarka._setCount(int.parse(_data[4]));
+      //person.smieci._setCount(int.parse(_data[5]));
+      //person.kotyJedzenie._setCount(int.parse(_data[6]));
+      //person.kotySprzatanie._setCount(int.parse(_data[7]));
     });
   }
 
@@ -175,10 +181,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await _myFile.writeAsString(person.housePart + '\n',mode: FileMode.append);
     await _myFile.writeAsString(person.deadline.toString() + '\n',mode: FileMode.append);
     await _myFile.writeAsString(person.lastSummary.toString() + '\n',mode: FileMode.append);
-    await _myFile.writeAsString(person.zmywarka._getCount().toString() + '\n',mode: FileMode.append);
-    await _myFile.writeAsString(person.smieci._getCount().toString() + '\n',mode: FileMode.append);
-    await _myFile.writeAsString(person.kotyJedzenie._getCount().toString() + '\n',mode: FileMode.append);
-    await _myFile.writeAsString(person.kotySprzatanie._getCount().toString() + '\n',mode: FileMode.append);
+
+    for(int i = 0; i < person.smallJobsArray.length; i++) {
+      await _myFile.writeAsString(person.smallJobsArray[i]._getCount().toString() + '\n',mode: FileMode.append);
+    }
+   // await _myFile.writeAsString(person.zmywarka._getCount().toString() + '\n',mode: FileMode.append);
+    //await _myFile.writeAsString(person.smieci._getCount().toString() + '\n',mode: FileMode.append);
+    //await _myFile.writeAsString(person.kotyJedzenie._getCount().toString() + '\n',mode: FileMode.append);
+    //await _myFile.writeAsString(person.kotySprzatanie._getCount().toString() + '\n',mode: FileMode.append);
   }
 
   void _changeNameNavigate(BuildContext context) async{
@@ -210,134 +220,44 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   void _addSmallChoreNavigate(BuildContext context) async{
-    SmallChoreType? newSmallChore = await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddingPage('DODAWANIE PRACY')));
+    String? newSmallChoreName = await Navigator.push(context, MaterialPageRoute(builder: (context) => AddingPage('DODAWANIE PRACY', person)));
     //newSmallChore przyjmuje wartość wybraną w AddingPage lub null (gdy gracz wyjdzie strzałką)
-    newSmallChore ??= SmallChoreType.none;
-    //gdy null to przyjmuje wartość none
-      switch (newSmallChore) { //dodaje to co wybrane, lub nic
-        case SmallChoreType.typeZmywarka :
-          {
-            person.zmywarka._addOneCount();
-            Fluttertoast.showToast(
-              msg: "Pomyślnie dodano zmywarkę",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-            break;
-          }
-        case SmallChoreType.typeSmieci :
-          {
-            person.smieci._addOneCount();
-            Fluttertoast.showToast(
-              msg: "Pomyślnie dodano śmieci",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-            break;
-          }
-        case SmallChoreType.typeKotyJedzonko :
-          {
-            person.kotyJedzenie._addOneCount();
-            Fluttertoast.showToast(
-              msg: "Pomyślnie dodano koty - jedzonko",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-            break;
-          }
-        case SmallChoreType.typeKotySprzatanie :
-          {
-            person.kotySprzatanie._addOneCount();
-            Fluttertoast.showToast(
-              msg: "Pomyślnie dodano koty - sprzątanie",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-            break;
-          }
-        default :
-          {
-            break;
-          }
-      }
+    newSmallChoreName ??= 'NONAME';
+    //gdy null to przyjmuje wartość NONAME
+
+    int listIndex = person.smallJobsArray.indexWhere((element) => element.name == newSmallChoreName);
+    if(listIndex != -1){
+      person.smallJobsArray[listIndex]._addOneCount();
+      Fluttertoast.showToast(
+        msg: "Pomyślnie dodano: " + person.smallJobsArray[listIndex].name,
+        toastLength: Toast.LENGTH_SHORT,
+      );
+    }
       setState(() {});
       _writeData();
   }
 
   void _substractSmallChoreNavigate(BuildContext context) async{
-    SmallChoreType? newSmallChore = await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddingPage('USUWANIE PRACY')));
+    String? newSmallChoreName = await Navigator.push(context, MaterialPageRoute(builder: (context) => AddingPage('USUWANIE PRACY', person)));
     //newSmallChore przyjmuje wartość wybraną w AddingPage lub null (gdy gracz wyjdzie strzałką)
-    newSmallChore ??= SmallChoreType.none;
+    newSmallChoreName ??= 'NONAME';
     //gdy null to przyjmuje wartość none
-    switch (newSmallChore) { //dodaje to co wybrane, lub nic
-      case SmallChoreType.typeZmywarka :
-        {
-          if(person.zmywarka._getCount() >= 1) {
-            person.zmywarka._removeOneCount();
-            Fluttertoast.showToast(
-              msg: "Pomyślnie usunięto zmywarkę",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-          }
-          else{
-            Fluttertoast.showToast(
-              msg: "BŁĄD! Nie masz zmywarki do usunięcia",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-          }
-          break;
-        }
-      case SmallChoreType.typeSmieci :
-        {
-          if(person.smieci._getCount() >= 1) {
-            person.smieci._removeOneCount();
-            Fluttertoast.showToast(
-              msg: "Pomyślnie usunięto śmieci",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-          }
-          else{
-            Fluttertoast.showToast(
-              msg: "BŁĄD! Nie masz śmieci do usunięcia",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-          }
-          break;
-        }
-      case SmallChoreType.typeKotyJedzonko :
-        {
-          if(person.kotyJedzenie._getCount() >= 1) {
-            person.kotyJedzenie._removeOneCount();
-            Fluttertoast.showToast(
-              msg: "Pomyślnie usunięto koty - jedzonko",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-          }
-          else{
-            Fluttertoast.showToast(
-              msg: "BŁĄD! Nie masz koty - jedzonko do usunięcia",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-          }
-          break;
-        }
-      case SmallChoreType.typeKotySprzatanie :
-        {
-          if(person.kotySprzatanie._getCount() >= 1) {
-            person.kotySprzatanie._removeOneCount();
-            Fluttertoast.showToast(
-              msg: "Pomyślnie usunięto koty - sprzątanie",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-          }
-          else{
-            Fluttertoast.showToast(
-              msg: "BŁĄD! Nie masz koty - sprzątanie do usunięcia",
-              toastLength: Toast.LENGTH_SHORT,
-            );
-          }
-          break;
-        }
-      default :
-        {
-          break;
-        }
+
+    int listIndex = person.smallJobsArray.indexWhere((element) => element.name == newSmallChoreName);
+    if(listIndex != -1){
+      if(person.smallJobsArray[listIndex]._getCount()>0) {
+        person.smallJobsArray[listIndex]._removeOneCount();
+        Fluttertoast.showToast(
+          msg: "Pomyślnie usunięto: " + person.smallJobsArray[listIndex].name,
+          toastLength: Toast.LENGTH_SHORT,
+        );
+      }
+      else{
+        Fluttertoast.showToast(
+          msg: 'OSIĄGNIĘTO ILOŚĆ MINIMALNĄ',
+          toastLength: Toast.LENGTH_SHORT,
+        );
+      }
     }
     setState(() {});
     _writeData();
@@ -348,10 +268,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     bool ifReset = false;
     ifReset = await Navigator.push(context, MaterialPageRoute(builder: (context) => SummaryPage(points,person.lastSummary)));
     if(ifReset){
-      person.zmywarka._resetCount();
-      person.smieci._resetCount();
-      person.kotyJedzenie._resetCount();
-      person.kotySprzatanie._resetCount();
+      for(int i = 0; i < person.smallJobsArray.length; i++){
+        person.smallJobsArray[i]._resetCount();
+      }
       setState(() {});
       _writeData();
     }
@@ -359,10 +278,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   int _countPoints(){
-    return person.zmywarka._getWholeValue() +
-        person.smieci._getWholeValue() +
-        person.kotyJedzenie._getWholeValue() +
-        person.kotySprzatanie._getWholeValue();
+    int points = 0;
+    for(int i = 0; i < person.smallJobsArray.length; i++){
+      points= (points+person.smallJobsArray[i]._getWholeValue()) as int;
+      //trzeba rzutować na inta, bo dart zamienia inty w num więc nie wie czy to nie doouble np
+    };
+    return points;
   }
 
   Future _pickDate(BuildContext context) async {
@@ -567,80 +488,30 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               const SizedBox(height: 10),
               Container(
                 constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height - 500),
-                child: ListView(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                        'ZMYWARKA',
-                        style: TextStyle(
-                          fontSize: 18,
-                        ),
+                child: ListView.builder(
+                  itemCount: person.smallJobsArray.length,
+                  itemBuilder: (context, index){
+                    return ListTile(
+                      visualDensity:VisualDensity(horizontal: 0, vertical: -4),
+                      title: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            person.smallJobsArray[index]._getName(),
+                            style: TextStyle(
+                              fontSize: 18,
+                            ),
+                          ),
+                          Text(
+                            person.smallJobsArray[index]._getCount().toString(),
+                            style: const TextStyle(
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
                       ),
-                        Text(
-                          person.zmywarka._getCount().toString(),
-                          style: const TextStyle(
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'ŚMIECI',
-                          style: TextStyle(
-                            fontSize: 18,
-                          ),
-                        ),
-                        Text(
-                          person.smieci._getCount().toString(),
-                          style: const TextStyle(
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'KOTY JEDZONKO',
-                          style: TextStyle(
-                            fontSize: 18,
-                          ),
-                        ),
-                        Text(
-                          person.kotyJedzenie._getCount().toString(),
-                          style: const TextStyle(
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'KOTY SPRZATANIE',
-                          style: TextStyle(
-                            fontSize: 18,
-                          ),
-                        ),
-                        Text(
-                          person.kotySprzatanie._getCount().toString(),
-                          style: const TextStyle(
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
               Center(
@@ -828,9 +699,10 @@ class _SummaryPageState extends State<SummaryPage> {
 }
 
 class AddingPage extends StatefulWidget {
-  const AddingPage(this.dodawanieCzyOdejmowanie, {Key? key}) : super(key: key);
+  const AddingPage(this.dodawanieCzyOdejmowanie, this.person, {Key? key}) : super(key: key);
 
   final String dodawanieCzyOdejmowanie;
+  final Person person;
 
   @override
   _AddingPageState createState() => _AddingPageState();
@@ -851,7 +723,7 @@ class _AddingPageState extends State<AddingPage>{
         backgroundColor: const Color(0xee050565),
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(30,40,30,40),
+        padding: const EdgeInsets.fromLTRB(30,30,30,40),
         child: Column(
           children: [
             const Center(
@@ -865,41 +737,25 @@ class _AddingPageState extends State<AddingPage>{
             const SizedBox(height: 30),
             Container(
               constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height - 300, maxWidth: MediaQuery.of(context).size.width - 150),
-              child: ListView(
-                children: [
-                  Container(
-                    height: 50,
-                    color: Colors.amber[400],
+              child: ListView.builder(
+                itemCount: widget.person.smallJobsArray.length,
+                itemBuilder: (context, index){
+                  return Container(
+                    color: Colors.amber[400 + index%2 * 100],
                     child: ListTile(
-                      title: const Center(child: Text('Zmywarka')),
-                      onTap: () {Navigator.pop(context,SmallChoreType.typeZmywarka);},
+                      visualDensity:VisualDensity(horizontal: 0, vertical: -1.5),
+                      title: Center(
+                        child: Text(
+                          widget.person.smallJobsArray[index]._getName(),
+                          style: TextStyle(
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                      onTap: () {Navigator.pop(context,widget.person.smallJobsArray[index].name);},
                     ),
-                  ),
-                  Container(
-                    height: 50,
-                    color: Colors.amber[500],
-                    child: ListTile(
-                      title: const Center(child: Text('Śmieci')),
-                      onTap: () {Navigator.pop(context,SmallChoreType.typeSmieci);},
-                    ),
-                  ),
-                  Container(
-                    height: 50,
-                    color: Colors.amber[400],
-                    child: ListTile(
-                      title: const Center(child: Text('Koty Jedzonko')),
-                      onTap: () {Navigator.pop(context,SmallChoreType.typeKotyJedzonko);},
-                    ),
-                  ),
-                  Container(
-                    height: 50,
-                    color: Colors.amber[500],
-                    child: ListTile(
-                      title: const Center(child: Text('Koty Sprzątanie')),
-                      onTap: () {Navigator.pop(context,SmallChoreType.typeKotySprzatanie);},
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 25),
@@ -909,7 +765,7 @@ class _AddingPageState extends State<AddingPage>{
                 ElevatedButton(
                     child: const Text('WRÓĆ'),
                     onPressed: (){
-                      Navigator.pop(context, SmallChoreType.none);
+                      Navigator.pop(context, 'NONAME');
                     }
                 ),
               ],
