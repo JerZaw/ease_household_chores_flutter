@@ -40,6 +40,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:numberpicker/numberpicker.dart';
 
 enum EditType {typeHousePart,typeName}
 
@@ -47,6 +48,8 @@ class SmallJob{
   int count = 0;
   int value = 0;
   String name = '';
+  String description = '';
+  bool extra = false;
 
   _addOneCount(){count++;}
   _removeOneCount(){count--;}
@@ -55,8 +58,12 @@ class SmallJob{
   _getCount(){return count;}
   _getWholeValue(){return count*value;}
   _getName(){return name;}
+  _getDescription(){return description;}
+  _getValue(){return value;}
+  _setExtra(){extra = true;}
+  bool _ifExtra(){return extra;}
 
-  SmallJob(this.value, [this.name = 'NONAME']);
+  SmallJob(this.value, this.name, [this.description = '', this.extra = false]);
 }
 
 class Person {
@@ -65,10 +72,21 @@ class Person {
   String housePart='NO_PART';
   DateTime deadline = DateTime.now();
   int daysLeft=0;
-  List<SmallJob> smallJobsArray = [SmallJob(3,'zmywarka'),SmallJob(2,'ociekacz'),SmallJob(2,'śmieci_wymiana'),
-    SmallJob(1,'śmieci_wyrzucenie'),SmallJob(2,'koty_jedzonko'),SmallJob(2,'koty_sprzątanie'),SmallJob(1,'papuga'),
-  SmallJob(2,'obiad_dod'),SmallJob(2,'ciasto'),SmallJob(2,'zakupy_małe'),SmallJob(4,'zakupy_Duże')];
+  List<SmallJob> smallJobsArray = [
+  SmallJob(3,'zmywarka', 'Rozładowanie i załadowanie gdy coś w zlewie + włączenie gdy pełna'),
+  SmallJob(1,'zmywarka_włączenie', 'załadowanie na maksa np. ze zlewu i włączenie'),
+  SmallJob(2,'ociekacz','rozładowanie ociekaczy (naczynia i sztućce)'),
+  SmallJob(2,'śmieci_wymiana','założenie nowych worków na śmieci'),
+  SmallJob(1,'śmieci_wyrzucenie','1 pełen kurs do śmietnika'),
+  SmallJob(2,'koty_jedzonko','jeden posiłek dla dwóch kotków'),
+  SmallJob(2,'koty_sprzątanie','sprzątnięcie kuwet + dosypanie piasku gdy mało'),
+  SmallJob(1,'papuga','wymiana jedzonka i wody papuga'),
+  SmallJob(2,'obiad_dod','dodatkowy obiad poza swoim dniem'),
+  SmallJob(2,'ciasto','ciasto lub inna przekąska dla rodzinki z pełnym sprzątnięciem po robieniu'),
+  SmallJob(2,'zakupy_małe','inaczej: zwykłe, codzienne'),
+  SmallJob(4,'zakupy_Duże','zazwyczaj w 2 os. w Lidlu, duże siaty lub samochodem')];
   DateTime lastSummary = DateTime.now();
+  List<SmallJob> extraJobsArray = List.filled(1, SmallJob(999,'pom','pom', true), growable: true);
 
 }
 
@@ -120,6 +138,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     person.deadline = DateTime.now();
     person.daysLeft = 0;
     person.lastSummary = DateTime.now();
+    person.extraJobsArray = List.filled(1, SmallJob(0,''), growable: true);
+    checkBoxValue = false;
+    daysBetween(person.deadline, DateTime.now());
 
     for(int i = 0; i < person.smallJobsArray.length; i++){
       person.smallJobsArray[i]._resetCount();
@@ -145,15 +166,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       person.lastSummary = DateTime.parse(_data[3]);
       person.daysLeft = daysBetween(DateTime.now(), person.deadline);
 
-
-      for(int i = 0; i < person.smallJobsArray.length; i++) {
+      int i;
+      for(i = 0; i < person.smallJobsArray.length; i++) {
         person.smallJobsArray[i]._setCount(int.parse(_data[i+4]));
       }
+      person.extraJobsArray.clear();
+      for(int j = i+4; j < _data.length; j+=3) {
+        person.extraJobsArray.add(SmallJob(int.parse(_data[j]),_data[j + 1],_data[j + 2], true));
+      }
 
-      //person.zmywarka._setCount(int.parse(_data[4]));
-      //person.smieci._setCount(int.parse(_data[5]));
-      //person.kotyJedzenie._setCount(int.parse(_data[6]));
-      //person.kotySprzatanie._setCount(int.parse(_data[7]));
+      allJobsArray = person.smallJobsArray + person.extraJobsArray.sublist(1);
+      setState(() {});
+
     });
   }
 
@@ -185,32 +209,40 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     for(int i = 0; i < person.smallJobsArray.length; i++) {
       await _myFile.writeAsString(person.smallJobsArray[i]._getCount().toString() + '\n',mode: FileMode.append);
     }
-   // await _myFile.writeAsString(person.zmywarka._getCount().toString() + '\n',mode: FileMode.append);
-    //await _myFile.writeAsString(person.smieci._getCount().toString() + '\n',mode: FileMode.append);
-    //await _myFile.writeAsString(person.kotyJedzenie._getCount().toString() + '\n',mode: FileMode.append);
-    //await _myFile.writeAsString(person.kotySprzatanie._getCount().toString() + '\n',mode: FileMode.append);
+
+    for(int i = 0; i < person.extraJobsArray.length; i++) {
+      await _myFile.writeAsString(person.extraJobsArray[i]._getValue().toString() + '\n',mode: FileMode.append);
+      await _myFile.writeAsString(person.extraJobsArray[i]._getName() + '\n',mode: FileMode.append);
+      await _myFile.writeAsString(person.extraJobsArray[i]._getDescription() + '\n',mode: FileMode.append);
+    }
   }
 
   void _changeNameNavigate(BuildContext context) async{
-    String lastdata = person.name;
-    person.name = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditionPage(person.name, EditType.typeName)));
+    String? lastData = person.name;
+    String? newData = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditionPage(person.name, EditType.typeName)));
+    newData ??= lastData;
     setState(() {});
     Navigator.pop(context);
-    if(person.name != lastdata) {
+    if(newData != lastData) {
       Fluttertoast.showToast(
           msg: "Pomyślnie zmieniono imię",
           toastLength: Toast.LENGTH_SHORT,
       );
+      person.name = newData;
       _writeData();
+      setState(() {});
     }
   }
 
   void _changeHousePartNavigate(BuildContext context) async{
-    String lastdata = person.housePart;
-    person.housePart = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditionPage(person.housePart, EditType.typeHousePart)));
-    setState(() {});
+    String? lastData = person.housePart;
+    String? newData = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditionPage(person.housePart, EditType.typeHousePart)));
+    newData ??= lastData;
     Navigator.pop(context);
-    if(person.housePart != lastdata) {
+    if(newData != lastData) {
+      checkBoxValue = false;
+      person.housePart = newData;
+      setState(() {});
       Fluttertoast.showToast(
         msg: "Pomyślnie zmieniono część domu",
         toastLength: Toast.LENGTH_SHORT,
@@ -220,7 +252,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   void _addSmallChoreNavigate(BuildContext context) async{
-    String? newSmallChoreName = await Navigator.push(context, MaterialPageRoute(builder: (context) => AddingPage('DODAWANIE PRACY', person)));
+    String? newSmallChoreName = await Navigator.push(context, MaterialPageRoute(builder: (context) => AddingPage('DODAWANIE PRACY', person, 'smalljob')));
     //newSmallChore przyjmuje wartość wybraną w AddingPage lub null (gdy gracz wyjdzie strzałką)
     newSmallChoreName ??= 'NONAME';
     //gdy null to przyjmuje wartość NONAME
@@ -238,7 +270,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   void _substractSmallChoreNavigate(BuildContext context) async{
-    String? newSmallChoreName = await Navigator.push(context, MaterialPageRoute(builder: (context) => AddingPage('USUWANIE PRACY', person)));
+    String? newSmallChoreName = await Navigator.push(context, MaterialPageRoute(builder: (context) => AddingPage('USUWANIE PRACY', person, 'smalljob')));
     //newSmallChore przyjmuje wartość wybraną w AddingPage lub null (gdy gracz wyjdzie strzałką)
     newSmallChoreName ??= 'NONAME';
     //gdy null to przyjmuje wartość none
@@ -263,10 +295,29 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _writeData();
   }
 
+  void _deleteExtraJobPageNavigate(BuildContext context) async{
+    String? newExtraJobName = await Navigator.push(context, MaterialPageRoute(builder: (context) => AddingPage('USUWANIE DOD. PRACY', person, 'extrajob')));
+    //newExtraJobName przyjmuje wartość wybraną w AddingPage lub null (gdy gracz wyjdzie strzałką)
+    newExtraJobName ??= 'NONAME';
+    //gdy null to przyjmuje wartość NONAME
+
+    int listIndex = person.extraJobsArray.indexWhere((element) => element.name == newExtraJobName);
+    if(listIndex != -1){
+        Fluttertoast.showToast(
+          msg: "Pomyślnie usunięto: " + person.extraJobsArray[listIndex].name,
+          toastLength: Toast.LENGTH_SHORT,
+        );
+        person.extraJobsArray.removeAt(listIndex);
+    }
+    allJobsArray = person.smallJobsArray + person.extraJobsArray.sublist(1);
+    setState(() {});
+    _writeData();
+  }
+
   void _summaryPageNavigate(BuildContext context) async{
     int points = _countPoints();
-    bool ifReset = false;
-    ifReset = await Navigator.push(context, MaterialPageRoute(builder: (context) => SummaryPage(points,person.lastSummary)));
+    bool? ifReset = await Navigator.push(context, MaterialPageRoute(builder: (context) => SummaryPage(points,person.lastSummary)));
+    ifReset ??= false; //jeżeli ifReset=null to ifReset=false
     if(ifReset){
       for(int i = 0; i < person.smallJobsArray.length; i++){
         person.smallJobsArray[i]._resetCount();
@@ -277,10 +328,26 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   }
 
+  void _descriptionPageNavigate(BuildContext context, int jobIndex) async{
+    await Navigator.push(context, MaterialPageRoute(builder: (context) => DescriptionPage(allJobsArray[jobIndex])));
+  }
+
+  void _AddExtraJobPageNavigate(BuildContext context) async{
+    SmallJob? extraJob = await Navigator.push(context, MaterialPageRoute(builder: (context) => AddExtraJobPage()));
+    if(extraJob != null){
+      extraJob._setExtra();
+      extraJob._addOneCount();
+      person.extraJobsArray.add(extraJob);
+      allJobsArray = person.smallJobsArray + person.extraJobsArray.sublist(1);
+      setState(() {});
+      _writeData();
+    }
+  }
+
   int _countPoints(){
     int points = 0;
-    for(int i = 0; i < person.smallJobsArray.length; i++){
-      points= (points+person.smallJobsArray[i]._getWholeValue()) as int;
+    for(int i = 0; i < allJobsArray.length; i++){
+      points= (points+allJobsArray[i]._getWholeValue()) as int;
       //trzeba rzutować na inta, bo dart zamienia inty w num więc nie wie czy to nie doouble np
     };
     return points;
@@ -307,6 +374,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       if(newDate != initialDate) {
         person.deadline = newDate;
         person.daysLeft = daysBetween(DateTime.now(), person.deadline);
+        checkBoxValue = false;
         setState(() {});
         Fluttertoast.showToast(
           msg: "Pomyślnie zmieniono deadline",
@@ -370,12 +438,69 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   String deadlineText(){
-    if(person.daysLeft >=0) {
-      return person.daysLeft.toString() + dniOdmiana;
+    if(checkBoxValue == false) {
+      if (person.daysLeft >= 0) {
+        return person.daysLeft.toString() + dniOdmiana;
+      }
+      else {
+        return 'PRZEKROCZONO';
+      }
     }
-    else
-      {return 'PRZEKROCZONO';}
+    else{
+      return 'WYKONANO';
+    }
   }
+
+  Color deadlineColor(){
+    if(checkBoxValue == false){
+      return deadlineTextColor;
+    }
+    else{
+      return Colors.green;
+    }
+  }
+
+  late List<SmallJob> allJobsArray = person.smallJobsArray + person.extraJobsArray.sublist(1);
+
+  Container _ListTileContainer1(int index){
+    if(allJobsArray[index]._ifExtra()){
+      return Container(
+        child: Row(
+          children: [
+            Icon(Icons.star, color: Color(0xffCBA72D),),
+            SizedBox(width: 2),
+          ],
+        ),
+      );
+    }
+    else{
+      return Container();
+    }
+  }
+
+  Container _ListTileContainer2(int index){
+    if(allJobsArray[index]._ifExtra()){
+      return Container(
+        child: Row(
+          children: [
+            Icon(Icons.star, color: Color(0xffCBA72D),),
+          ],
+        ),
+      );
+    }
+    else{
+      return Container(
+        child: Text(
+          allJobsArray[index]._getCount().toString(),
+          style: const TextStyle(
+            fontSize: 18,
+          ),
+        ),
+      );
+    }
+  }
+
+  bool? checkBoxValue = false;
 
     @override
     Widget build(BuildContext context) {
@@ -394,16 +519,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           child: ListView(
             padding: EdgeInsets.zero,
             children: [
-              const SizedBox(
-                height: 88,
-                child: DrawerHeader(
-                  decoration: BoxDecoration(
-                    color: Color(0xee2d2dd7),
-                  ),
+              DrawerHeader(
+                //padding: EdgeInsets.zero,
+                margin: EdgeInsets.zero,
+                decoration: BoxDecoration(
+                  color: Color(0xee2d2dd7),
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
                   child: Text(
                       'Edytuj Twoje Dane',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 22,
                       color: Colors.white
                     ),
                   ),
@@ -444,88 +571,135 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
         body: Padding(
           padding: const EdgeInsets.fromLTRB(30,40,30,40),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const Text(
-                  'IMIĘ i NAZWISKO'
-              ),
-              const SizedBox(height: 10),
-              Text(
-                  person.name,
-                style: const TextStyle(
-                  fontSize: 25,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                    'IMIĘ i NAZWISKO'
                 ),
-              ),
-              const SizedBox(height: 30),
-              const Text(
-                  'CZĘŚĆ DOMU DO SPRZĄTNIĘCIA'
-              ),
-              const SizedBox(height: 10),
-              Text(
-                person.housePart,
-                style: const TextStyle(
-                  fontSize: 25,
-                ),
-              ),
-              const SizedBox(height: 30),
-              const Text(
-                  'DEADLINE'
-              ),
-              const SizedBox(height: 10),
-              Text(
-                deadlineText(),
-                style: TextStyle(
-                  fontSize: 30,
-                  color: deadlineTextColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 30),
-              const Text(
-                  'MAŁE PRACE ZROBIONE W TYM TYGODNIU'
-              ),
-              const SizedBox(height: 10),
-              Container(
-                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height - 500),
-                child: ListView.builder(
-                  itemCount: person.smallJobsArray.length,
-                  itemBuilder: (context, index){
-                    return ListTile(
-                      visualDensity:VisualDensity(horizontal: 0, vertical: -4),
-                      title: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            person.smallJobsArray[index]._getName(),
-                            style: TextStyle(
-                              fontSize: 18,
-                            ),
-                          ),
-                          Text(
-                            person.smallJobsArray[index]._getCount().toString(),
-                            style: const TextStyle(
-                              fontSize: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              Center(
-                child: ElevatedButton(
-                  onPressed: (){_summaryPageNavigate(context);},
-                  child: Text(
-                    'PODSUMOWANIE',
-                    style: TextStyle(
-                      fontSize: 16,
-                    ),
+                const SizedBox(height: 10),
+                Text(
+                    person.name,
+                  style: const TextStyle(
+                    fontSize: 25,
                   ),
                 ),
-              )
-            ],
+                const SizedBox(height: 30),
+                const Text(
+                    'CZĘŚĆ DOMU DO SPRZĄTNIĘCIA'
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  person.housePart,
+                  style: const TextStyle(
+                    fontSize: 25,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                Row(
+                  children: [
+                    const Text(
+                        'DEADLINE'
+                    ),
+                    SizedBox(width: 5),
+                    Container(
+                      constraints: BoxConstraints(maxHeight: 30, maxWidth: 30),
+                      child: Transform.scale(
+                        scale: 1.3,
+                        child: Checkbox(
+                            splashRadius: 20,
+                            value: checkBoxValue,
+                            activeColor: Colors.green,
+                            onChanged: (bool? newValue){
+                              setState(() {
+                                checkBoxValue = newValue;
+                              });
+                              },
+                            ),
+                      ),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  deadlineText(),
+                  style: TextStyle(
+                    fontSize: 30,
+                    color: deadlineColor(),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Text(
+                        'MAŁE PRACE ZROBIONE W TYM TYGODNIU'
+                    ),
+                    SizedBox(width: 5),
+                    Container(
+                      constraints: BoxConstraints(maxHeight: 30, maxWidth: 30),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.lightBlue,
+                      ),
+                      child: IconButton(
+                          iconSize: 14,
+                          color: Colors.white,
+                          onPressed: (){},
+                          icon: Icon(const IconData(983750, fontFamily: 'MaterialIcons')),
+                        tooltip: 'Zarządzaj dodatkowymi pracami',
+                      ),
+                    )
+                  ],
+                ),
+                Container(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height - 500),
+                  child: ListView.builder(
+                    itemCount: allJobsArray.length,
+                    itemBuilder: (context, index){
+                      return ListTile(
+                        onTap: (){_descriptionPageNavigate(context, index);},
+                        visualDensity:VisualDensity(horizontal: 0, vertical: -4),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                _ListTileContainer1(index),
+                                Text(
+                                  allJobsArray[index]._getName(),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Icon(
+                                    const IconData(61736, fontFamily: 'MaterialIcons'),
+                                    size: 15,
+                                  ),
+                              ],
+                            ),
+                            _ListTileContainer2(index),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Center(
+                  child: ElevatedButton(
+                    onPressed: (){_summaryPageNavigate(context);},
+                    child: Text(
+                      'PODSUMOWANIE',
+                      style: TextStyle(
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                )
+              ],
+            ),
           ),
         ),
         floatingActionButton: SpeedDial(
@@ -545,6 +719,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               label: 'Dodaj pracę',
               onTap: (){_addSmallChoreNavigate(context);},
             ),
+            SpeedDialChild(
+              child: const Icon(const IconData(59123, fontFamily: 'MaterialIcons')),
+              backgroundColor: const Color(0xf02295f2),
+              foregroundColor: Colors.white,
+              label: 'Usuń dodatkową pracę',
+              onTap: (){_deleteExtraJobPageNavigate(context);},
+            ),
+            SpeedDialChild(
+              child: const Icon(const IconData(59122, fontFamily: 'MaterialIcons')),
+              backgroundColor: const Color(0xf02295f2),
+              foregroundColor: Colors.white,
+              label: 'Dodatkowa praca',
+              onTap: (){_AddExtraJobPageNavigate(context);},
+            ),
+
           ],
         )
       );
@@ -699,8 +888,9 @@ class _SummaryPageState extends State<SummaryPage> {
 }
 
 class AddingPage extends StatefulWidget {
-  const AddingPage(this.dodawanieCzyOdejmowanie, this.person, {Key? key}) : super(key: key);
+  const AddingPage(this.dodawanieCzyOdejmowanie, this.person, this.smallOrExtra, {Key? key}) : super(key: key);
 
+  final String smallOrExtra;
   final String dodawanieCzyOdejmowanie;
   final Person person;
 
@@ -709,6 +899,59 @@ class AddingPage extends StatefulWidget {
 }
 
 class _AddingPageState extends State<AddingPage>{
+
+  ListView _jobTypeDependingContainer(String jobType){
+    if(jobType == 'smalljob'){
+      return ListView.builder(
+        itemCount: widget.person.smallJobsArray.length,
+        itemBuilder: (context, index){
+          return Container(
+            color: Colors.amber[400 + index%2 * 100],
+            child: ListTile(
+              visualDensity:VisualDensity(horizontal: 0, vertical: -1.5),
+              title: Center(
+                child: Text(
+                  widget.person.smallJobsArray[index]._getName(),
+                  style: TextStyle(
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              onTap: () {Navigator.pop(context,widget.person.smallJobsArray[index].name);},
+            ),
+          );
+        },
+      );
+    }
+    else if (jobType == 'extrajob'){
+      return ListView.builder(
+        itemCount: widget.person.extraJobsArray.length - 1,
+        itemBuilder: (context, index){
+          return Container(
+            color: Colors.amber[400 + index%2 * 100],
+            child: ListTile(
+              visualDensity:VisualDensity(horizontal: 0, vertical: -1.5),
+              title: Center(
+                child: Text(
+                  widget.person.extraJobsArray[index+1]._getName(),
+                  style: TextStyle(
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              onTap: () {Navigator.pop(context,widget.person.extraJobsArray[index+1].name);},
+            ),
+          );
+        },
+      );
+    }
+    else{
+      return ListView(
+          children: [Container(child:Text('!!ERROR!!'))]
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -737,26 +980,7 @@ class _AddingPageState extends State<AddingPage>{
             const SizedBox(height: 30),
             Container(
               constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height - 300, maxWidth: MediaQuery.of(context).size.width - 150),
-              child: ListView.builder(
-                itemCount: widget.person.smallJobsArray.length,
-                itemBuilder: (context, index){
-                  return Container(
-                    color: Colors.amber[400 + index%2 * 100],
-                    child: ListTile(
-                      visualDensity:VisualDensity(horizontal: 0, vertical: -1.5),
-                      title: Center(
-                        child: Text(
-                          widget.person.smallJobsArray[index]._getName(),
-                          style: TextStyle(
-                            fontSize: 18,
-                          ),
-                        ),
-                      ),
-                      onTap: () {Navigator.pop(context,widget.person.smallJobsArray[index].name);},
-                    ),
-                  );
-                },
-              ),
+              child: _jobTypeDependingContainer(widget.smallOrExtra),
             ),
             const SizedBox(height: 25),
             Row(
@@ -842,6 +1066,211 @@ class _EditionPageState extends State<EditionPage> {
               ],
             )
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class DescriptionPage extends StatefulWidget {
+
+  final SmallJob job;
+  DescriptionPage(this.job, {Key? key}) : super(key: key);
+
+  @override
+  _DescriptionPageState createState() => _DescriptionPageState();
+}
+
+class _DescriptionPageState extends State<DescriptionPage> {
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'OPIS',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(width: 10),
+            Icon(const IconData(63510, fontFamily: 'MaterialIcons')),
+          ],
+        ),
+        centerTitle: true,
+        backgroundColor: const Color(0xee050565),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(30,40,30,40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              children: [
+                Container(
+                  color: Colors.amber,
+                  padding: EdgeInsets.fromLTRB(20, 10, 20, 10),
+                  child: Text(
+                    'PRACA',
+                    style: TextStyle(
+                        fontSize: 25,
+                        fontWeight: FontWeight.bold
+                    ),
+                  ),
+                ),
+                SizedBox(width: 20),
+                Text(
+                  widget.job.name,
+                  style: TextStyle(
+                    fontSize: 20,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 3),
+            Row(
+              children: [
+                Container(
+                  color: Colors.amber,
+                  padding: EdgeInsets.fromLTRB(20, 10, 20, 10),
+                  child: Text(
+                    'WARTOŚĆ PUNKTOWA',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold
+                    ),
+                  ),
+                ),
+                SizedBox(width: 20),
+                Text(
+                  widget.job.value.toString(),
+                  style: TextStyle(
+                      fontSize: 20
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 3),
+            Container(
+              constraints: BoxConstraints(minWidth: double.infinity),
+              padding: EdgeInsets.fromLTRB(20, 10, 20, 10),
+              color: Colors.lightBlueAccent,
+              //alignment: ,
+              child: Text(
+                widget.job._getDescription(),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            SizedBox(height: 25),
+            ElevatedButton(
+                onPressed: (){
+                  Navigator.pop(context);
+                },
+                child: const Text('WRÓĆ')
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AddExtraJobPage extends StatefulWidget {
+  const AddExtraJobPage({Key? key}) : super(key: key);
+
+  @override
+  _AddExtraJobPageState createState() => _AddExtraJobPageState();
+}
+
+class _AddExtraJobPageState extends State<AddExtraJobPage> {
+
+  TextEditingController nameController = TextEditingController(
+      text: '');
+
+  TextEditingController descriptionController = TextEditingController(
+      text: '');
+
+  int newJobValue = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'PRACA EKSTRA',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: const Color(0xee050565),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(30,40,30,40),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Podaj informacje dotyczące dodatkowej pracy',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                )
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(labelText: 'NAZWA'),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                keyboardType: TextInputType.text,
+                maxLines: null,
+                controller: descriptionController,
+                decoration: InputDecoration(labelText: 'OPIS'),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                  'Wartość punktowa:',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                  )
+              ),
+              NumberPicker(
+                  minValue: 1,
+                  maxValue: 10,
+                  value: newJobValue,
+                  onChanged: (value) => setState(() => newJobValue = value),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                      onPressed: (){
+                        Navigator.pop(context);
+                      },
+                      child: const Text('WRÓĆ')
+                  ),
+                  ElevatedButton(
+                      onPressed: (){
+                        Navigator.pop(context, SmallJob(newJobValue, nameController.text, descriptionController.text));
+                      },
+                      child: const Text('ZAPISZ')
+                  ),
+                ],
+              )
+            ],
+          ),
         ),
       ),
     );
