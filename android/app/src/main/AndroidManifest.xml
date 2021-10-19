@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="jerzaw_apps.com.easy_household_chores">
    <application
-        android:label="hsh_chores"
+        android:label="HChores"
         android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"

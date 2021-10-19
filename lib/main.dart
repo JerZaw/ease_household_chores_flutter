@@ -76,13 +76,11 @@ class Person {
   SmallJob(3,'zmywarka', 'Rozładowanie i załadowanie gdy coś w zlewie + włączenie gdy pełna'),
   SmallJob(1,'zmywarka_włączenie', 'załadowanie na maksa np. ze zlewu i włączenie'),
   SmallJob(2,'ociekacz','rozładowanie ociekaczy (naczynia i sztućce)'),
-  SmallJob(2,'śmieci_wymiana','założenie nowych worków na śmieci'),
-  SmallJob(1,'śmieci_wyrzucenie','1 pełen kurs do śmietnika'),
+  SmallJob(2,'śmieci_całe','założenie nowych worków na śmieci + wyrzucenie do śmietnika'),
+  SmallJob(1,'śmieci_pół','samo założenie worków lub samo wyrzucenie'),
   SmallJob(2,'koty_jedzonko','jeden posiłek dla dwóch kotków'),
   SmallJob(2,'koty_sprzątanie','sprzątnięcie kuwet + dosypanie piasku gdy mało'),
   SmallJob(1,'papuga','wymiana jedzonka i wody papuga'),
-  SmallJob(2,'obiad_dod','dodatkowy obiad poza swoim dniem'),
-  SmallJob(2,'ciasto','ciasto lub inna przekąska dla rodzinki z pełnym sprzątnięciem po robieniu'),
   SmallJob(2,'zakupy_małe','inaczej: zwykłe, codzienne'),
   SmallJob(4,'zakupy_Duże','zazwyczaj w 2 os. w Lidlu, duże siaty lub samochodem')];
   DateTime lastSummary = DateTime.now();
@@ -322,6 +320,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       for(int i = 0; i < person.smallJobsArray.length; i++){
         person.smallJobsArray[i]._resetCount();
       }
+      person.extraJobsArray = List.filled(1, SmallJob(999,'pom','pom', true), growable: true);
+      allJobsArray = person.smallJobsArray + person.extraJobsArray.sublist(1);
       setState(() {});
       _writeData();
     }
