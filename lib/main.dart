@@ -72,6 +72,7 @@ class Person {
   String housePart='NO_PART';
   DateTime deadline = DateTime.now();
   int daysLeft=0;
+  bool mainTaskDone = false;
   List<SmallJob> smallJobsArray = [
   SmallJob(3,'zmywarka', 'Rozładowanie i załadowanie gdy coś w zlewie + włączenie gdy pełna'),
   SmallJob(1,'zmywarka_włączenie', 'załadowanie na maksa np. ze zlewu i włączenie'),
@@ -135,9 +136,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     person.housePart = "NO_PART";
     person.deadline = DateTime.now();
     person.daysLeft = 0;
+    person.mainTaskDone = false;
     person.lastSummary = DateTime.now();
     person.extraJobsArray = List.filled(1, SmallJob(0,''), growable: true);
-    checkBoxValue = false;
     daysBetween(person.deadline, DateTime.now());
 
     for(int i = 0; i < person.smallJobsArray.length; i++){
@@ -161,15 +162,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       person.name = _data[0];
       person.housePart = _data[1];
       person.deadline = DateTime.parse(_data[2]);
-      person.lastSummary = DateTime.parse(_data[3]);
+      person.mainTaskDone = _data[3] == 'true';
+      person.lastSummary = DateTime.parse(_data[4]);
       person.daysLeft = daysBetween(DateTime.now(), person.deadline);
 
       int i;
       for(i = 0; i < person.smallJobsArray.length; i++) {
-        person.smallJobsArray[i]._setCount(int.parse(_data[i+4]));
+        person.smallJobsArray[i]._setCount(int.parse(_data[i+5]));
       }
       person.extraJobsArray.clear();
-      for(int j = i+4; j < _data.length; j+=3) {
+      for(int j = i+5; j < _data.length; j+=3) {
         person.extraJobsArray.add(SmallJob(int.parse(_data[j]),_data[j + 1],_data[j + 2], true));
       }
 
@@ -202,6 +204,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     await _myFile.writeAsString(person.name + '\n');
     await _myFile.writeAsString(person.housePart + '\n',mode: FileMode.append);
     await _myFile.writeAsString(person.deadline.toString() + '\n',mode: FileMode.append);
+    await _myFile.writeAsString(person.mainTaskDone.toString() + '\n',mode: FileMode.append);
     await _myFile.writeAsString(person.lastSummary.toString() + '\n',mode: FileMode.append);
 
     for(int i = 0; i < person.smallJobsArray.length; i++) {
@@ -238,7 +241,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     newData ??= lastData;
     Navigator.pop(context);
     if(newData != lastData) {
-      checkBoxValue = false;
+      person.mainTaskDone = false;
       person.housePart = newData;
       setState(() {});
       Fluttertoast.showToast(
@@ -374,7 +377,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       if(newDate != initialDate) {
         person.deadline = newDate;
         person.daysLeft = daysBetween(DateTime.now(), person.deadline);
-        checkBoxValue = false;
+        person.mainTaskDone = false;
         setState(() {});
         Fluttertoast.showToast(
           msg: "Pomyślnie zmieniono deadline",
@@ -438,7 +441,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   String deadlineText(){
-    if(checkBoxValue == false) {
+    if(person.mainTaskDone == false) {
       if (person.daysLeft >= 0) {
         return person.daysLeft.toString() + dniOdmiana;
       }
@@ -452,7 +455,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Color deadlineColor(){
-    if(checkBoxValue == false){
+    if(person.mainTaskDone == false){
       return deadlineTextColor;
     }
     else{
@@ -499,8 +502,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       );
     }
   }
-
-  bool? checkBoxValue = false;
 
     @override
     Widget build(BuildContext context) {
@@ -609,12 +610,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         scale: 1.3,
                         child: Checkbox(
                             splashRadius: 20,
-                            value: checkBoxValue,
+                            value: person.mainTaskDone,
                             activeColor: Colors.green,
                             onChanged: (bool? newValue){
                               setState(() {
-                                checkBoxValue = newValue;
+                                person.mainTaskDone = newValue!;
                               });
+                              _writeData();
                               },
                             ),
                       ),
@@ -637,20 +639,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         'MAŁE PRACE ZROBIONE W TYM TYGODNIU'
                     ),
                     SizedBox(width: 5),
-                    Container(
-                      constraints: BoxConstraints(maxHeight: 30, maxWidth: 30),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.lightBlue,
-                      ),
-                      child: IconButton(
-                          iconSize: 14,
-                          color: Colors.white,
-                          onPressed: (){},
-                          icon: Icon(const IconData(983750, fontFamily: 'MaterialIcons')),
-                        tooltip: 'Zarządzaj dodatkowymi pracami',
-                      ),
-                    )
+                    // Container(
+                    //   constraints: BoxConstraints(maxHeight: 30, maxWidth: 30),
+                    //   decoration: BoxDecoration(
+                    //     shape: BoxShape.circle,
+                    //     color: Colors.lightBlue,
+                    //   ),
+                    //   child: IconButton(
+                    //       iconSize: 14,
+                    //       color: Colors.white,
+                    //       onPressed: (){},
+                    //       icon: Icon(const IconData(983750, fontFamily: 'MaterialIcons')),
+                    //     tooltip: 'Zarządzaj dodatkowymi pracami',
+                    //   ),
+                    // )
                   ],
                 ),
                 Container(
@@ -680,7 +682,28 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                   ),
                               ],
                             ),
-                            _ListTileContainer2(index),
+                            Row(
+                              children: [
+                                IconButton(
+                                  splashRadius: 15,
+                                  splashColor: Colors.lightBlueAccent,
+                                  iconSize: 25,
+                                  color: const Color(0xB002A6F2),
+                                  onPressed: (){
+                                    person.smallJobsArray[index].count++;
+                                    _writeData();
+                                    setState((){});
+                                    Fluttertoast.showToast(
+                                      msg: "Pomyślnie dodano: "+person.smallJobsArray[index]._getName(),
+                                      toastLength: Toast.LENGTH_SHORT,
+                                    );
+                                  },
+                                  icon: Icon(const IconData(0xe047, fontFamily: 'MaterialIcons')),
+                                  tooltip: 'dodaj pracę',
+                                ),
+                                _ListTileContainer2(index),
+                              ],
+                            ),
                           ],
                         ),
                       );
@@ -690,6 +713,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 Center(
                   child: ElevatedButton(
                     onPressed: (){_summaryPageNavigate(context);},
+                    style: ButtonStyle(
+                      backgroundColor: MaterialStateProperty.all(const Color(0xee050565))
+                    ),
                     child: Text(
                       'PODSUMOWANIE',
                       style: TextStyle(
